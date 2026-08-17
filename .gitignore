@@ -1,0 +1,12 @@
+.env
+token.json
+credentials.json
+.spotify_token.json
+cron_jobs.json
+reminders.json
+__pycache__/
+*.pyc
+screenshots/
+run_bridge.bat
+run_hidden.vbs
+start_silent.vbs

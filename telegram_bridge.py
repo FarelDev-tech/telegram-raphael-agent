@@ -66,14 +66,43 @@ def ensure_single_instance(port=49555):
         sys.exit(0)
 
 # -------------------------------------------------------------
-# Configuration
+# Configuration & Environment
 # -------------------------------------------------------------
-TELEGRAM_BOT_TOKEN = "8854097319:AAHaR_Tz2lmGML6e62oTc2q_erm7P6Ahmjg"
-ALLOWED_USER_ID = 1380172602
-GEMINI_API_KEY = "AIzaSyCAAuwepqWxoXJ2P8mmLUX4H0Wg2H5HFt8"
-GROQ_API_KEY = "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"
+# Load .env file if present
+ENV_FILE = os.path.join(SCRIPT_DIR, ".env")
+if os.path.exists(ENV_FILE):
+    try:
+        with open(ENV_FILE, "r", encoding="utf-8") as ef:
+            for line in ef:
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    os.environ[k.strip()] = v.strip().strip('"').strip("'")
+    except Exception:
+        pass
 
-CURRENT_ENGINE = "openai/gpt-oss-120b" # Default to Groq's SOTA 120B model (500 tokens/sec)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8854097319:AAHaR_Tz2lmGML6e62oTc2q_erm7P6Ahmjg")
+ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "1380172602"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCAAuwepqWxoXJ2P8mmLUX4H0Wg2H5HFt8")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+
+CURRENT_ENGINE = os.getenv("CURRENT_ENGINE", "openai/gpt-oss-120b")
+
+def get_wib_now():
+    """Returns exact current datetime in Asia/Jakarta (WIB, UTC+7) regardless of host server timezone."""
+    tz_wib = datetime.timezone(datetime.timedelta(hours=7))
+    return datetime.datetime.now(datetime.timezone.utc).astimezone(tz_wib)
+
+def sync_brain_vault_to_git():
+    """Asynchronously commits and pushes vault changes if in a git repo."""
+    def _sync():
+        try:
+            repo_root = SCRIPT_DIR
+            subprocess.run(["git", "add", "AI-Brain/"], cwd=repo_root, capture_output=True, timeout=10)
+            subprocess.run(["git", "commit", "-m", "sync: auto-sync AI-Brain from cloud agent"], cwd=repo_root, capture_output=True, timeout=10)
+            subprocess.run(["git", "push", "origin", "main"], cwd=repo_root, capture_output=True, timeout=15)
+        except Exception:
+            pass
+    threading.Thread(target=_sync, daemon=True).start()
 
 # Primary Priority Models (Strictly Gemini 3.7, 3.6, and 3.5 ONLY — Baseline Floor: 3.5)
 PRIMARY_MODELS = [
@@ -1057,16 +1086,18 @@ def get_brain_context():
 
 def append_to_daily_log(user_msg, bot_resp):
     try:
-        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        now = get_wib_now()
+        today_str = now.strftime("%Y-%m-%d")
         daily_log_dir = os.path.join(BRAIN_DIR, "12_Logs", "Daily")
         os.makedirs(daily_log_dir, exist_ok=True)
         daily_log_path = os.path.join(daily_log_dir, f"{today_str}.md")
 
-        now_time = datetime.datetime.now().strftime("%H:%M:%S")
+        now_time = now.strftime("%H:%M:%S")
         log_entry = f"\n\n### Telegram Interaction [{now_time}]\n- **Master Farel:** {user_msg}\n- **Raphael:** {bot_resp}\n"
 
         with open(daily_log_path, "a", encoding="utf-8") as f:
             f.write(log_entry)
+        sync_brain_vault_to_git()
     except Exception as e:
         print(f"[Log Error] {e}")
 
@@ -1076,8 +1107,8 @@ def append_to_daily_log(user_msg, bot_resp):
 def build_system_instruction():
     brain_context = get_brain_context()
     
-    # Dynamic live timestamp
-    now = datetime.datetime.now()
+    # Dynamic live timestamp strictly anchored in Asia/Jakarta (WIB)
+    now = get_wib_now()
     day_name = DAYS_ID[now.weekday()]
     month_name = MONTHS_ID[now.month - 1]
     live_time_str = f"{day_name}, {now.day} {month_name} {now.year} — {now.strftime('%H:%M:%S')} WIB (UTC+7)"
@@ -1795,7 +1826,7 @@ def process_message(chat_id, user_id, message):
         else:
             response_text = query_gemini_agent(augmented_text if augmented_text else text, media_base64, mime_type)
     elif any(p in clean_lower for p in time_phrases):
-        now = datetime.datetime.now()
+        now = get_wib_now()
         day_name = DAYS_ID[now.weekday()]
         month_name = MONTHS_ID[now.month - 1]
         response_text = f"**Jawaban.**\nSaat ini pukul **{now.strftime('%H:%M:%S')} WIB** ({day_name}, {now.day} {month_name} {now.year}), Master Farel."
@@ -1982,7 +2013,7 @@ def process_message(chat_id, user_id, message):
         out = tool_search_vault(q)
         response_text = f"**Laporan.**\nHasil pencarian kata kunci `{q}` di AI-Brain:\n```json\n{json.dumps(out, indent=2)}\n```"
     elif clean_lower == "/status":
-        now = datetime.datetime.now()
+        now = get_wib_now()
         day_name = DAYS_ID[now.weekday()]
         now_str = f"{day_name}, {now.strftime('%d-%m-%Y — %H:%M:%S')} WIB"
         jobs = load_cron_jobs()
