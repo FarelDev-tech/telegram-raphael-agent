@@ -1264,9 +1264,17 @@ def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
     if not GROQ_API_KEY:
         return None
     url = "https://api.groq.com/openai/v1/chat/completions"
-    groq_messages = [{"role": "system", "content": system_prompt}]
     
-    for turn in contents:
+    # Compact system prompt for Groq to guarantee zero 413 errors
+    compact_system = system_prompt
+    if len(compact_system) > 3500:
+        compact_system = compact_system[:3500] + "\n[Instruksi Utama: Selalu jawab Master Farel secara cerdas, formal, ramah, dan ringkas sesuai persona Raphael (Great Sage / Ciel).]"
+
+    groq_messages = [{"role": "system", "content": compact_system}]
+    
+    # Keep only the last 6 turns for Groq context to prevent token ceiling
+    recent_contents = contents[-6:] if len(contents) > 6 else contents
+    for turn in recent_contents:
         role = turn.get("role")
         m_role = "user" if role == "user" else "assistant"
         c_text = ""
@@ -1274,20 +1282,20 @@ def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
             if isinstance(p, dict) and "text" in p:
                 c_text += p["text"] + "\n"
         if c_text.strip():
-            groq_messages.append({"role": m_role, "content": c_text.strip()})
+            groq_messages.append({"role": m_role, "content": c_text.strip()[:2000]})
 
     payload = {
         "model": model_name,
         "messages": groq_messages,
         "temperature": 0.6,
-        "max_tokens": 4096
+        "max_tokens": 2048
     }
     try:
         res = session.post(
             url,
             headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
             json=payload,
-            timeout=20
+            timeout=15
         )
         if res.status_code == 200:
             reply = res.json()["choices"][0]["message"]["content"].strip()
