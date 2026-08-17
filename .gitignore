@@ -4,6 +4,8 @@ credentials.json
 .spotify_token.json
 cron_jobs.json
 reminders.json
+auth_url.txt
+login_url.txt
 __pycache__/
 *.pyc
 screenshots/
