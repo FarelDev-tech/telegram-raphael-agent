@@ -1070,12 +1070,38 @@ def get_brain_context():
         except Exception:
             pass
 
-    # 4. Knowledge Index & Recent Notes Map
+    # 4. Master Profile & Core Vision
+    self_path = os.path.join(BRAIN_DIR, "09_Self", "Farel.md")
+    if os.path.exists(self_path):
+        try:
+            with open(self_path, "r", encoding="utf-8") as f:
+                parts.append(f"### Master Farel Profile:\n{f.read()[:800]}")
+        except Exception:
+            pass
+
+    # 5. Semester 3 Curriculum & Academic Goals
+    curric_path = os.path.join(BRAIN_DIR, "03_Learning", "Courses", "Semester-3-Curriculum.md")
+    if os.path.exists(curric_path):
+        try:
+            with open(curric_path, "r", encoding="utf-8") as f:
+                parts.append(f"### Semester 3 Curriculum:\n{f.read()[:1500]}")
+        except Exception:
+            pass
+
+    goals_path = os.path.join(BRAIN_DIR, "08_Goals", "Short-Term", "Semester-3-Academic-Goals.md")
+    if os.path.exists(goals_path):
+        try:
+            with open(goals_path, "r", encoding="utf-8") as f:
+                parts.append(f"### Academic Goals:\n{f.read()[:800]}")
+        except Exception:
+            pass
+
+    # 6. Knowledge Index Map
     k_idx_path = os.path.join(BRAIN_DIR, "02_Knowledge", "Knowledge Index.md")
     if os.path.exists(k_idx_path):
         try:
             with open(k_idx_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Knowledge Base Map:\n{f.read()}")
+                parts.append(f"### Knowledge Base Map:\n{f.read()[:1000]}")
         except Exception:
             pass
 
@@ -1296,10 +1322,13 @@ def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
         return None
     url = "https://api.groq.com/openai/v1/chat/completions"
     
-    # Compact system prompt for Groq to guarantee zero 413 errors
-    compact_system = system_prompt
-    if len(compact_system) > 3500:
-        compact_system = compact_system[:3500] + "\n[Instruksi Utama: Selalu jawab Master Farel secara cerdas, formal, ramah, dan ringkas sesuai persona Raphael (Great Sage / Ciel).]"
+    # Compact system prompt for Groq to guarantee zero 413 errors and direct fact answering
+    compact_system = (
+        f"{system_prompt}\n\n"
+        f"[Instruksi Utama Raphael: Seluruh data memori AI-Brain Master Farel (profil, mata kuliah Semester 3, rencana studi, target akademik, to-do list) "
+        f"SUDAH TERSEDIA LENGKAP pada konteks di atas. Jawablah setiap pertanyaan Master Farel secara langsung, ramah, cerdas, faktual, dan mendalam sesuai persona "
+        f"Raphael (Great Sage / Ciel) dengan format formal ('Laporan.', 'Jawaban.'). JANGAN meminta pencarian tool tambahan jika data sudah ada di atas!]"
+    )
 
     groq_messages = [{"role": "system", "content": compact_system}]
     
