@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.vscode
+screenshots/
+run_bridge.bat
+run_hidden.vbs
+start_silent.vbs

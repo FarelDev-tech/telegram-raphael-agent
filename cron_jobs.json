@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cron_daily_review",
+    "title": "Daily Review Protocol",
+    "type": "fixed_time",
+    "time": "21:45",
+    "recurrence": "daily",
+    "task_type": "agentic",
+    "instruction": "Waktunya untuk Daily Review penutupan hari bagi Master Farel. Buka catatan hari ini di 12_Logs/Daily/ dan AI-Brain, lalu buatkan ringkasan capaian, evaluasi belajar, dan pesan penutup hari yang hangat, analitis, dan rapi sesuai persona Raphael.",
+    "created_at": "2026-08-16 19:22:00"
+  },
+  {
+    "id": "cron_off_screen",
+    "title": "Off-Screen Protocol",
+    "type": "fixed_time",
+    "time": "22:00",
+    "recurrence": "daily",
+    "task_type": "static",
+    "instruction": "Pemberitahuan.\nSaat ini pukul 22:00 WIB. Off-Screen Protocol aktif, Master Farel. Disarankan untuk mematikan atau mengurangi screen time laptop dan gadget agar mata dan pikiran Master tetap segar dan rileks.",
+    "created_at": "2026-08-16 19:22:00"
+  },
+  {
+    "id": "cron_sleep_protocol",
+    "title": "Sleep Protocol",
+    "type": "fixed_time",
+    "time": "22:45",
+    "recurrence": "daily",
+    "task_type": "static",
+    "instruction": "Pemberitahuan.\nSaat ini pukul 22:45 WIB. Sleep Protocol diaktifkan. Selamat beristirahat dan tidur nyenyak, Master Farel. Seluruh sistem AI-Brain akan tetap terjaga di latar belakang. Selamat malam!",
+    "created_at": "2026-08-16 19:22:00"
+  }
+]

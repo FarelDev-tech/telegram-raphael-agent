@@ -1,0 +1,23 @@
+[
+  {
+    "id": "daily_review",
+    "time": "21:45",
+    "title": "Daily Review Protocol",
+    "prompt": "Pemberitahuan.\nSaat ini pukul 21:45 WIB. Waktunya untuk Daily Review penutupan hari, Master Farel. Mari kita rekap singkat apa yang telah kita capai dan pelajari hari ini di AI-Brain sebelum beristirahat.",
+    "recurring": true
+  },
+  {
+    "id": "off_screen",
+    "time": "22:00",
+    "title": "Off-Screen Protocol",
+    "prompt": "Pemberitahuan.\nSaat ini pukul 22:00 WIB. Off-Screen Protocol aktif, Master Farel. Disarankan untuk mematikan atau mengurangi screen time laptop dan gadget agar mata dan pikiran Master tetap segar dan rileks.",
+    "recurring": true
+  },
+  {
+    "id": "sleep_time",
+    "time": "22:45",
+    "title": "Sleep Protocol",
+    "prompt": "Pemberitahuan.\nSaat ini pukul 22:45 WIB. Sleep Protocol diaktifkan. Selamat beristirahat dan tidur nyenyak, Master Farel. Seluruh sistem AI-Brain akan tetap terjaga di latar belakang. Selamat malam!",
+    "recurring": true
+  }
+]
