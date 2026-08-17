@@ -1,19 +1,32 @@
-Laporan.  
-Berikut merupakan mata kuliah yang diambil Master Farel pada **Semester 3** (20 SKS / 40 jam per minggu) beserta SKS masing‑masing:
+**Master Farel, berikut rangkuman akademik Semester 3 Anda:**
 
-| Kode MK | Mata Kuliah                     | SKS | Jam / Minggu | Pilar Utama |
-|---------|--------------------------------|-----|--------------|-------------|
-| **SIB253001** | Jaringan Komputer                | 2   | 4            | Infrastruktur & Jaringan |
-| **SIB253002** | Praktikum Jaringan Komputer       | 2   | 4            | Infrastruktur & Jaringan |
-| **SIB253003** | Rekayasa Perangkat Lunak          | 2   | 4            | Pemrograman & Software Engineering |
-| **SIB253004** | Pemrograman Berorientasi Objek    | 2   | 4            | Pemrograman & Software Engineering |
-| **SIB253005** | Praktikum Pemrograman Berorientasi Objek | 2   | 4            | Pemrograman & Software Engineering |
-| **SIB253006** | Basis Data Lanjut                 | 3   | 6            | Pengembangan Web & Basis Data |
-| **SIB253007** | Pemrograman Web                   | 3   | 6            | Pengembangan Web & Basis Data |
-| **SIB253008** | Desain UI/UX                      | 2   | 4            | Desain & Analisis Data |
-| **SIB253009** | Statistika                        | 2   | 4            | Desain & Analisis Data |
-| **TOTAL**   | **20 SKS**                        |     | **40**       | |
+---
 
-**Target Prestasi Akademik (IPK/IPS):**  
-- Target **Indeks Prestasi Semester (IPS)** untuk Semester 3 ditetapkan **≥ 3,75** (nilai A pada mata kuliah inti).  
-- Pada dokumen tujuan akademik tidak terdapat nilai target IPK keseluruhan; yang tersedia hanyalah target IPS semester ini. Jika Master menginginkan target IPK keseluruhan, mohon konfirmasi atau beri arahan tambahan.
+### 📚 Mata Kuliah yang diambil (20 SKS)
+
+| Kode MK | Mata Kuliah | SKS | Jam / Minggu | Pilar Utama |
+|---|---|---:|---:|---|
+| **SIB253001** | Jaringan Komputer | 2 | 4 | Infrastruktur & Jaringan |
+| **SIB253002** | Praktikum Jaringan Komputer | 2 | 4 | Infrastruktur & Jaringan |
+| **SIB253003** | Rekayasa Perangkat Lunak | 2 | 4 | Pemrograman & Software Engineering |
+| **SIB253004** | Pemrograman Berorientasi Objek | 2 | 4 | Pemrograman & Software Engineering |
+| **SIB253005** | Praktikum Pemrograman Berorientasi Objek | 2 | 4 | Pemrograman & Software Engineering |
+| **SIB253006** | Basis Data Lanjut | 3 | 6 | Pengembangan Web & Basis Data |
+| **SIB253007** | Pemrograman Web | 3 | 6 | Pengembangan Web & Basis Data |
+| **SIB253008** | Desain UI/UX | 2 | 4 | Desain & Analisis Data |
+| **SIB253009** | Statistika | 2 | 4 | Desain & Analisis Data |
+| **TOTAL** | — | **20 SKS** | **40 Jam** | — |
+
+*(Sumber: `03_Learning/Courses/Semester-3-Curriculum.md`)*
+
+---
+
+### 🎯 Target Indeks Prestasi (IPK/IPS) Semester 3
+
+- **Target IPS ≥ 3.75**  
+  (dengan harapan memperoleh nilai A pada mata kuliah inti koding & rekayasa).  
+  *(Sumber: `08_Goals/Short-Term/Semester-3-Academic-Goals.md`)*
+
+Jika Anda menginginkan pencatatan tambahan, pembuatan tugas, atau penjadwalan reminder terkait target ini, beri tahu saya—saya siap menyiapkan semuanya.  
+
+**Semangat belajar, Master!** 🚀

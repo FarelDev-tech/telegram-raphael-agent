@@ -85,7 +85,7 @@ ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "1380172602"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCAAuwepqWxoXJ2P8mmLUX4H0Wg2H5HFt8")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
-CURRENT_ENGINE = os.getenv("CURRENT_ENGINE", "openai/gpt-oss-120b")
+CURRENT_ENGINE = os.getenv("CURRENT_ENGINE", "qwen/qwen3.6-27b")
 
 def get_wib_now():
     """Returns exact current datetime in Asia/Jakarta (WIB, UTC+7) regardless of host server timezone."""
@@ -1079,24 +1079,7 @@ def get_brain_context():
         except Exception:
             pass
 
-    # 5. Semester 3 Curriculum & Academic Goals
-    curric_path = os.path.join(BRAIN_DIR, "03_Learning", "Courses", "Semester-3-Curriculum.md")
-    if os.path.exists(curric_path):
-        try:
-            with open(curric_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Semester 3 Curriculum:\n{f.read()[:1500]}")
-        except Exception:
-            pass
-
-    goals_path = os.path.join(BRAIN_DIR, "08_Goals", "Short-Term", "Semester-3-Academic-Goals.md")
-    if os.path.exists(goals_path):
-        try:
-            with open(goals_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Academic Goals:\n{f.read()[:800]}")
-        except Exception:
-            pass
-
-    # 6. Knowledge Index Map
+    # 5. Knowledge Index Map
     k_idx_path = os.path.join(BRAIN_DIR, "02_Knowledge", "Knowledge Index.md")
     if os.path.exists(k_idx_path):
         try:
@@ -1316,23 +1299,122 @@ def transcribe_audio(media_base64, mime_type="audio/ogg"):
             time.sleep(0.2)
     return None
 
-def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
-    """Executes chat completions on Groq (OpenAI GPT-OSS 120B / Qwen 3.6 27B / Compound)."""
+def get_groq_openai_tools():
+    """Returns core dynamic agentic tools for Groq in standard OpenAI schema."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "search_vault",
+                "description": "Full-text search across all markdown files in the AI-Brain vault for any keyword, concept, course, or topic.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string", "description": "Search keyword or topic"}},
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "read_vault_file",
+                "description": "Read the exact live markdown content of any file in the AI-Brain vault.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string", "description": "Relative path to file in AI-Brain (e.g. 03_Learning/Courses/Semester-3-Curriculum.md)"}},
+                    "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "write_vault_file",
+                "description": "Create or update a markdown note in the AI-Brain vault to record new learning, summaries, or decisions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Relative path in AI-Brain"},
+                        "content": {"type": "string", "description": "Markdown content"}
+                    },
+                    "required": ["path", "content"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_task",
+                "description": "Create a new task in Active-Tasks.md and sync to Google Tasks.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Task description"},
+                        "due_date": {"type": "string", "description": "Optional due date (YYYY-MM-DD)"},
+                        "category": {"type": "string", "description": "study, project, personal"}
+                    },
+                    "required": ["title"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "spotify_control",
+                "description": "Control Spotify music playback on Master's phone (Realme 13+ 5G) or laptop.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "description": "play, pause, next, prev, queue, lyrics"},
+                        "query": {"type": "string", "description": "Song title or artist name"}
+                    },
+                    "required": ["action"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the live Internet for latest information, news, or external technical documentation.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string", "description": "Search query"}},
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_calendar_event",
+                "description": "Schedule an event in Google Calendar.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Event title"},
+                        "start_iso": {"type": "string", "description": "Start ISO datetime"}
+                    },
+                    "required": ["title", "start_iso"]
+                }
+            }
+        }
+    ]
+
+def call_groq_agent_loop(system_prompt, contents, model_name="qwen/qwen3.6-27b"):
+    """Executes a true dynamic multi-hop agentic loop on Groq LPU with live vault tools."""
     if not GROQ_API_KEY:
         return None
     url = "https://api.groq.com/openai/v1/chat/completions"
+    tools = get_groq_openai_tools()
     
-    # Compact system prompt for Groq to guarantee zero 413 errors and direct fact answering
-    compact_system = (
-        f"{system_prompt}\n\n"
-        f"[Instruksi Utama Raphael: Seluruh data memori AI-Brain Master Farel (profil, mata kuliah Semester 3, rencana studi, target akademik, to-do list) "
-        f"SUDAH TERSEDIA LENGKAP pada konteks di atas. Jawablah setiap pertanyaan Master Farel secara langsung, ramah, cerdas, faktual, dan mendalam sesuai persona "
-        f"Raphael (Great Sage / Ciel) dengan format formal ('Laporan.', 'Jawaban.'). JANGAN meminta pencarian tool tambahan jika data sudah ada di atas!]"
-    )
+    # Keep system prompt focused for Groq LPU
+    compact_system = system_prompt
+    if len(compact_system) > 1500:
+        compact_system = compact_system[:1500] + "\n[Instruksi Utama: Selalu gunakan tools search_vault atau read_vault_file untuk membaca catatan nyata di AI-Brain sebelum menjawab. Jawab sebagai Raphael.]"
 
-    groq_messages = [{"role": "system", "content": compact_system}]
+    messages = [{"role": "system", "content": compact_system}]
     
-    # Keep only the last 6 turns for Groq context to prevent token ceiling
     recent_contents = contents[-6:] if len(contents) > 6 else contents
     for turn in recent_contents:
         role = turn.get("role")
@@ -1342,30 +1424,62 @@ def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
             if isinstance(p, dict) and "text" in p:
                 c_text += p["text"] + "\n"
         if c_text.strip():
-            groq_messages.append({"role": m_role, "content": c_text.strip()[:2000]})
+            messages.append({"role": m_role, "content": c_text.strip()[:1500]})
 
-    payload = {
-        "model": model_name,
-        "messages": groq_messages,
-        "temperature": 0.6,
-        "max_tokens": 2048
-    }
-    try:
-        res = session.post(
-            url,
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=15
-        )
-        if res.status_code == 200:
-            reply = res.json()["choices"][0]["message"]["content"].strip()
-            if "<think>" in reply and "</think>" in reply:
-                reply = reply.split("</think>")[-1].strip()
-            return reply
-        else:
-            print(f"[Groq API Status {res.status_code}] {res.text[:120]}")
-    except Exception as e:
-        print(f"[Groq Call Error] {e}")
+    for hop in range(6):
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+            "temperature": 0.2,
+            "max_tokens": 4096
+        }
+        try:
+            res = session.post(
+                url,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=25
+            )
+            if res.status_code != 200:
+                print(f"[Groq Agent Status {res.status_code}] {res.text[:140]}")
+                break
+                
+            choice = res.json()["choices"][0]
+            msg = choice["message"]
+            
+            # Case 1: Model called one or more tools dynamically on disk
+            if msg.get("tool_calls"):
+                messages.append(msg)
+                for tc in msg["tool_calls"]:
+                    fn_name = tc["function"]["name"]
+                    raw_args = tc["function"].get("arguments", "{}")
+                    try:
+                        fn_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    except Exception:
+                        fn_args = {}
+                    
+                    # Execute real tool dynamically on disk
+                    tool_output = execute_tool_call(fn_name, fn_args)
+                    
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "name": fn_name,
+                        "content": str(tool_output)[:2500]
+                    })
+                continue
+            else:
+                # Case 2: Final synthesized answer from Groq
+                ans = msg.get("content", "")
+                if ans:
+                    if "<think>" in ans and "</think>" in ans:
+                        ans = ans.split("</think>")[-1].strip()
+                    return ans
+        except Exception as e:
+            print(f"[Groq Agent Loop Error] {e}")
+            break
     return None
 
 # -------------------------------------------------------------
@@ -1443,9 +1557,9 @@ def query_gemini_agent(user_text, media_base64=None, mime_type=None, is_system_c
     else:
         local_contents = [{"role": "user", "parts": user_parts}]
 
-    # Fast-Path routing for Groq SOTA Engines (OpenAI GPT-OSS 120B, Qwen 3.6 27B)
+    # Fast-Path dynamic agentic loop for Groq SOTA Engines (OpenAI GPT-OSS 120B, Qwen 3.6 27B)
     if CURRENT_ENGINE.startswith(("openai/", "qwen/", "groq/")) and not media_base64:
-        groq_resp = call_groq_api(system_instruction, local_contents, model_name=CURRENT_ENGINE)
+        groq_resp = call_groq_agent_loop(system_instruction, local_contents, model_name=CURRENT_ENGINE)
         if groq_resp:
             if not is_system_cron:
                 conversation_history.append({"role": "model", "parts": [{"text": groq_resp}]})
