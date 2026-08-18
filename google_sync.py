@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -192,35 +193,68 @@ class GoogleSyncEngine:
             with open(vault_tasks_file, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            lines = content.split("\n")
-            modified = False
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-
+            
+            # Map google tasks by normalized title
+            gt_map = {}
             for gt in google_tasks:
-                gt_title = gt.get("title", "").strip()
-                gt_status = gt.get("status", "needsAction")
-                
-                if not gt_title:
+                t_title = (gt.get("title") or "").strip().lower()
+                if t_title:
+                    gt_map[t_title] = gt
+
+            lines = content.split("\n")
+            new_lines = []
+            modified = False
+
+            for line in lines:
+                s_line = line.strip()
+                if s_line.startswith("- [ ]") or s_line.startswith("- [x]"):
+                    # Extract task title
+                    # e.g. "- [ ] Bersih-bersih pagi 📅 2026-08-18 #general ✅ 2026-08-18"
+                    raw_task = re.sub(r"^-\s*\[[ xX]\]\s*", "", s_line)
+                    # Strip existing completed date
+                    raw_task_clean = re.sub(r"\s*✅\s*\d{4}-\d{2}-\d{2}.*$", "", raw_task).strip()
+                    # Strip due date and tag for matching
+                    core_title = re.sub(r"📅\s*\d{4}-\d{2}-\d{2}", "", raw_task_clean)
+                    core_title = re.sub(r"#[a-zA-Z0-9_-]+", "", core_title).strip().lower()
+
+                    matched_gt = gt_map.get(core_title)
+                    if not matched_gt:
+                        # Try partial matching
+                        for g_title, g_obj in gt_map.items():
+                            if g_title in core_title or core_title in g_title:
+                                matched_gt = g_obj
+                                break
+
+                    if matched_gt:
+                        g_status = matched_gt.get("status", "needsAction")
+                        if g_status == "completed":
+                            new_line = f"- [x] {raw_task_clean} ✅ {today_str}"
+                            if new_line != s_line:
+                                modified = True
+                            new_lines.append(new_line)
+                        else:
+                            new_line = f"- [ ] {raw_task_clean}"
+                            if new_line != s_line:
+                                modified = True
+                            new_lines.append(new_line)
+                    else:
+                        new_lines.append(s_line)
+                else:
+                    new_lines.append(line)
+
+            # Clean consecutive empty lines
+            cleaned_content = []
+            for l in new_lines:
+                if l.strip() == "" and cleaned_content and cleaned_content[-1].strip() == "":
                     continue
+                cleaned_content.append(l)
 
-                # Match with markdown lines
-                for idx, line in enumerate(lines):
-                    clean_line = line.strip()
-                    if clean_line.startswith("- [ ]") and gt_title.lower() in clean_line.lower():
-                        if gt_status == "completed":
-                            lines[idx] = line.replace("- [ ]", "- [x]") + f" ✅ {today_str}"
-                            modified = True
-                    elif clean_line.startswith("- [x]") and gt_title.lower() in clean_line.lower():
-                        if gt_status == "needsAction":
-                            lines[idx] = line.replace("- [x]", "- [ ]").split(" ✅")[0]
-                            modified = True
+            final_text = "\n".join(cleaned_content).strip() + "\n"
+            with open(vault_tasks_file, "w", encoding="utf-8") as f:
+                f.write(final_text)
 
-            if modified:
-                with open(vault_tasks_file, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines))
-                return {"status": "success", "modified": True, "synced_tasks": len(google_tasks)}
-
-            return {"status": "success", "modified": False, "synced_tasks": len(google_tasks)}
+            return {"status": "success", "modified": modified, "synced_tasks": len(google_tasks)}
         except Exception as e:
             print(f"[Sync Error] {e}")
             return {"status": "error", "message": str(e)}
