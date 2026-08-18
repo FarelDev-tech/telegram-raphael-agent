@@ -1033,51 +1033,9 @@ def execute_tool_call(name, args):
 # AI-Brain Context Engine
 # -------------------------------------------------------------
 def get_brain_context():
-    now = time.time()
-    if now - context_cache["last_read"] < 60 and context_cache["content"]:
-        return context_cache["content"]
-
-    parts = []
-    
-    # 1. Current Context
-    curr_ctx_path = os.path.join(BRAIN_DIR, "14_Assistant", "Current Context.md")
-    if os.path.exists(curr_ctx_path):
-        try:
-            with open(curr_ctx_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Current Context:\n{f.read()}")
-        except Exception:
-            pass
-
-    # 2. Learning Profile
-    profile_path = os.path.join(BRAIN_DIR, "06_Memory", "Learning Profile.md")
-    if os.path.exists(profile_path):
-        try:
-            with open(profile_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Learning Profile:\n{f.read()}")
-        except Exception:
-            pass
-
-    # 3. Active Tasks Summary
-    if os.path.exists(ACTIVE_TASKS_FILE):
-        try:
-            with open(ACTIVE_TASKS_FILE, "r", encoding="utf-8") as f:
-                parts.append(f"### Active Tasks Hub:\n{f.read()[:1000]}")
-        except Exception:
-            pass
-
-    # 4. Knowledge Index & Recent Notes Map
-    k_idx_path = os.path.join(BRAIN_DIR, "02_Knowledge", "Knowledge Index.md")
-    if os.path.exists(k_idx_path):
-        try:
-            with open(k_idx_path, "r", encoding="utf-8") as f:
-                parts.append(f"### Knowledge Base Map:\n{f.read()}")
-        except Exception:
-            pass
-
-    full_text = "\n\n".join(parts)
-    context_cache["content"] = full_text
-    context_cache["last_read"] = now
-    return full_text
+    # Ultra-lean memory baseline: Never dump whole vault files into working memory!
+    # Tasks and specific course notes are fetched on-demand via tools (Human-Like Recall).
+    return "Master Farel (Informatics Engineering Student, Solo, Indonesia). Vault Ground Truth: AI-Brain."
 
 def append_to_daily_log(user_msg, bot_resp):
     try:
@@ -1148,6 +1106,15 @@ Even when Master Farel does NOT use slash commands (e.g. speaking naturally via 
 - **Autonomous Structured Brainstorming**: When Master expresses uncertainty, seeks new ideas, or asks to design a new feature/system from scratch (e.g. "Bantu aku cari ide fitur baru MejaKita", "Bingung mau mulai tugas RPL dari mana"), AUTO-ACTIVATE 9-Step Ideation: define the real problem & constraints, then present 3 distinct innovative alternatives with trade-offs.
 - **Autonomous Impeccable Design & Anti-AI-Slop (Paul Bakaus & Anthropic)**: When Master discusses UI/UX, layouts, web designs, CSS, or frontend components, AUTO-ACTIVATE Impeccable standard: enforce intentional typography, cohesive HSL palettes, functional whitespace, and strictly eliminate generic AI tropes.
 - **Autonomous Deep Modules (John Ousterhout)**: When writing or discussing code functions and modules, ensure public interfaces remain simple and elegant while hiding deep complexity within.
+
+## Strict Target, Anti-Bloat & Conciseness Directive (CRITICAL):
+- **JAWAB HANYA APA YANG DITANYAKAN / DIMINTA MASTER FAREL!**
+- **DILARANG KERAS** menyertakan hal-hal yang tidak relevan dengan pertanyaan spesifik Master:
+  * JANGAN menyertakan tabel daftar tugas/jadwal jika Master tidak memintanya!
+  * JANGAN menyertakan info lagu/Spotify yang sedang diputar jika Master tidak bertanya tentang musik!
+  * JANGAN menyertakan tips produktivitas/metode Pomodoro/rutinitas malam jika tidak diminta!
+  * JANGAN membuat esai penutup yang panjang bertele-tele (*no unsolicited filler, no unsolicited task tables*).
+- Jaga jawaban tetap cerdas, presisi, padat, santai (*chill*), dan tepat sasaran (maksimal 1–3 paragraf ringkas).
 
 ## Rules of Engagement & Anti-Hallucination Directives:
 1. **Response Style**: Maintain a calm, highly analytical, objective, genius-level, and absolutely loyal demeanor, while keeping a relaxed, friendly, and natural (chill) conversation style.
@@ -1569,7 +1536,7 @@ def call_groq_agent_loop(system_prompt, contents, model_name="qwen/qwen3.6-27b")
                     elif m.get("role") == "assistant" and m.get("content"):
                         fallback_messages.append({"role": "assistant", "content": m.get("content")})
                 
-                fallback_messages.append({"role": "user", "content": "Tolong berikan ringkasan laporan jadwal/jawaban yang lengkap dan ramah untuk Master Farel berdasarkan data catatan di atas."})
+                fallback_messages.append({"role": "user", "content": "Jawab pertanyaan Master Farel secara cerdas, tepat sasaran, dan ringkas tanpa menambahkan info di luar yang ditanyakan."})
                 
                 fb_payload = {
                     "model": "openai/gpt-oss-120b",
