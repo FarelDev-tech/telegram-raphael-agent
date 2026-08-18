@@ -117,10 +117,23 @@ class GoogleSyncEngine:
                     res = self.tasks_service.tasks().patch(tasklist='@default', task=t_id, body=patch_body).execute()
                     return {"status": "success", "updated_id": t_id, "new_title": res.get("title")}
 
-            # If not found to patch, create cleanly
             return self.add_task(new_title, new_notes or "", new_due_date)
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def clear_completed_tasks(self):
+        """Permanently deletes completed tasks on Google Tasks cloud."""
+        deleted_count = 0
+        if self.is_authenticated():
+            tasks = self.fetch_all_google_tasks()
+            for t in tasks:
+                if t.get("status") == "completed":
+                    try:
+                        self.tasks_service.tasks().delete(tasklist='@default', task=t.get("id")).execute()
+                        deleted_count += 1
+                    except Exception:
+                        pass
+        return {"status": "success", "deleted_completed_tasks": deleted_count}
 
     def deduplicate_tasks(self, vault_tasks_file=None):
         """Cleans up all duplicates on Google Tasks cloud and Obsidian Active-Tasks.md."""

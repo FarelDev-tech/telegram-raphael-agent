@@ -2461,6 +2461,17 @@ def process_message(chat_id, user_id, message):
             "• **Konteks Obrolan:** 0 Token (Hemat maksimal ⚡)\n"
             "• **Memori AI-Brain (Vault):** 🟢 Tetap 100% tersambung dan siap diakses kapan pun Master butuhkan!"
         )
+    elif clean_lower in ("/cleartasks", "/cleartask", "/hapustask", "/cleartasksdone"):
+        del_count = 0
+        if google_sync and google_sync.is_authenticated():
+            res_c = google_sync.clear_completed_tasks()
+            del_count = res_c.get("deleted_completed_tasks", 0)
+        
+        response_text = (
+            "🧹 **Laporan Pembersihan Tugas Selesai.**\n"
+            f"• **Google Tasks Cloud:** Seluruh tugas selesai telah dibersihkan.\n"
+            "• **Obsidian Active-Tasks.md:** 🟢 Daftar tugas aktif telah disegarkan, hanya menyisakan tugas yang belum selesai!"
+        )
     elif clean_lower == "/help":
         response_text = (
             "**Panduan Lengkap Raphael AI-Brain (Versi 2.5.0 — Agent Skills & High-Effort Cognitive Hub):**\n\n"
