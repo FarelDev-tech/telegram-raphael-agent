@@ -90,7 +90,17 @@ class SpotifyCloudController:
                 return spotipy.Spotify(auth=token_info["access_token"])
         except Exception as e:
             print(f"[Spotify get_client Error] {e}")
-        return None
+    def is_authenticated(self):
+        return self.get_client() is not None
+
+    def get_devices(self):
+        sp = self.get_client()
+        if not sp:
+            return []
+        try:
+            return sp.devices().get("devices", [])
+        except Exception:
+            return []
 
     def get_devices_dict(self, sp):
         devs = sp.devices().get("devices", [])

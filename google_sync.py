@@ -225,16 +225,17 @@ class GoogleSyncEngine:
             print(f"[Sync Error] {e}")
             return {"status": "error", "message": str(e)}
 
-    def add_calendar_event(self, summary, start_iso, end_iso=None, description="", location=""):
+    def add_calendar_event(self, summary=None, start_iso=None, end_iso=None, description="", location="", title=None):
         if not self.is_authenticated():
             return {"status": "vault_only", "message": "Google Calendar belum diautentikasi."}
         try:
-            if not end_iso:
+            event_title = summary or title or "Acara Kalender"
+            if not end_iso and start_iso:
                 st = datetime.datetime.fromisoformat(start_iso)
                 end_iso = (st + datetime.timedelta(hours=1)).isoformat()
 
             event = {
-                'summary': summary,
+                'summary': event_title,
                 'location': location,
                 'description': description,
                 'start': {

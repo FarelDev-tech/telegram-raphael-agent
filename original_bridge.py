@@ -65,35 +65,22 @@ def ensure_single_instance(port=49555):
         print("[Single-Instance] Instance already running. Terminating duplicate.")
         sys.exit(0)
 
-# Native .env loader (zero external dependencies)
-ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-if os.path.exists(ENV_FILE):
-    try:
-        with open(ENV_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    k_clean = k.strip()
-                    v_clean = v.strip().strip('"').strip("'")
-                    os.environ[k_clean] = v_clean
-    except Exception:
-        pass
+# -------------------------------------------------------------
+# Configuration
+# -------------------------------------------------------------
+TELEGRAM_BOT_TOKEN = "8854097319:AAHaR_Tz2lmGML6e62oTc2q_erm7P6Ahmjg"
+ALLOWED_USER_ID = 1380172602
+GEMINI_API_KEY = "AIzaSyCAAuwepqWxoXJ2P8mmLUX4H0Wg2H5HFt8"
+GROQ_API_KEY = "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"
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "1380172602"))
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+CURRENT_ENGINE = "openai/gpt-oss-120b" # Default to Groq's SOTA 120B model (500 tokens/sec)
 
-CURRENT_ENGINE = os.getenv("CURRENT_ENGINE", "gemini-3.5-flash-lite")
-
-# Primary Priority Models for Google Gemini
+# Primary Priority Models (Strictly Gemini 3.7, 3.6, and 3.5 ONLY — Baseline Floor: 3.5)
 PRIMARY_MODELS = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.6-flash",
     "gemini-3.7-flash",
+    "gemini-3.6-flash",
     "gemini-3.5-flash",
-    "gemini-flash-latest"
+    "gemini-3.5-flash-lite"
 ]
 
 BRAIN_DIR = os.getenv("BRAIN_DIR") or (r"C:\Users\USER\Obsidian\AI-Brain" if os.path.exists(r"C:\Users\USER\Obsidian\AI-Brain") else os.path.join(os.path.dirname(os.path.abspath(__file__)), "AI-Brain"))
@@ -155,17 +142,11 @@ def tool_create_task(title, due_date=None, category="general", priority="normal"
         print(f"[Task Write Error] {e}")
 
     # 2. Push to Google Tasks if authenticated
-    google_status = "Tersimpan di AI-Brain"
+    google_status = "Tersimpan di AI-Brain (Google Tasks menunggu otorisasi credentials.json)"
     if google_sync and google_sync.is_authenticated():
         res = google_sync.add_task(title=title, notes=notes or f"Category: {category}", due_date=due_date)
         if res.get("status") == "success":
             google_status = "100% Tersinkronisasi ke Google Tasks di HP Master"
-        elif res.get("status") == "already_exists":
-            google_status = "100% Tersinkronisasi (Tugas sudah aktif di Google Tasks HP Master)"
-        else:
-            google_status = f"Google Tasks: {res.get('message', 'Tercatat')}"
-    else:
-        google_status = "Tersimpan di AI-Brain (Google Tasks menunggu konfigurasi)"
 
     return {
         "status": "success",
@@ -530,8 +511,6 @@ def tool_read_vault_file(path):
     try:
         with open(full_path, "r", encoding="utf-8") as f:
             content = f.read()
-        if len(content) > 2500:
-            return content[:2500] + "\n\n...[cuplikan utama berkas]..."
         return content
     except Exception as e:
         return f"Error membaca berkas: {e}"
@@ -569,14 +548,11 @@ def tool_list_vault_directory(path=""):
     if not full_path or not os.path.exists(full_path):
         return f"Error: Direktori '{path}' tidak ditemukan."
     try:
-        entries = os.listdir(full_path)
-        folders = [e for e in entries if os.path.isdir(os.path.join(full_path, e))]
-        files = [e for e in entries if os.path.isfile(os.path.join(full_path, e)) and e.endswith(".md")]
-        return {
-            "path": path or "/",
-            "folders": folders,
-            "markdown_files": files
-        }
+        items = os.listdir(full_path)
+        dirs = [f"[DIR] {d}" for d in items if os.path.isdir(os.path.join(full_path, d)) and not d.startswith(".")]
+        files = [f for f in items if os.path.isfile(os.path.join(full_path, f))]
+        rel = os.path.relpath(full_path, BRAIN_DIR).replace("\\", "/")
+        return {"directories": dirs, "files": files, "path": rel or "/"}
     except Exception as e:
         return f"Error melihat direktori: {e}"
 
@@ -585,7 +561,7 @@ def tool_search_vault(query):
     results = []
     try:
         for root, _, files in os.walk(BRAIN_DIR):
-            if ".obsidian" in root or ".git" in root:
+            if ".obsidian" in root:
                 continue
             for file in files:
                 if file.endswith(".md"):
@@ -596,14 +572,14 @@ def tool_search_vault(query):
                             text = f.read()
                         if query_lower in text.lower() or query_lower in file.lower():
                             lines = text.split("\n")
-                            matched_snippets = [line.strip() for line in lines if query_lower in line.lower() and len(line.strip()) > 3][:2]
-                            snip_str = " | ".join(matched_snippets) if matched_snippets else "Cocok nama berkas"
-                            results.append(f"- `{rel_path}`: {snip_str}")
+                            matched_snippets = [line.strip() for line in lines if query_lower in line.lower()][:3]
+                            results.append({
+                                "file": rel_path,
+                                "snippets": matched_snippets
+                            })
                     except Exception:
                         pass
-        if not results:
-            return f"Pencarian '{query}': Tidak ada berkas yang cocok."
-        return f"Hasil Pencarian Vault untuk '{query}' ({len(results)} berkas):\n" + "\n".join(results[:4])
+        return {"query": query, "total_found": len(results), "results": results[:10]}
     except Exception as e:
         return f"Error pencarian: {e}"
 
@@ -1265,14 +1241,11 @@ def transcribe_audio(media_base64, mime_type="audio/ogg"):
     for m in audio_models:
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
         try:
-            headers = {
-                "Content-Type": "application/json",
-                "X-goog-api-key": GEMINI_API_KEY
-            }
             res = session.post(
                 api_url,
+                params={"key": GEMINI_API_KEY},
                 json=payload,
-                headers=headers,
+                headers={"Content-Type": "application/json"},
                 timeout=(3.05, 15)
             )
             if res.status_code == 200:
@@ -1286,247 +1259,14 @@ def transcribe_audio(media_base64, mime_type="audio/ogg"):
             time.sleep(0.2)
     return None
 
-# -------------------------------------------------------------
-# Live Model & Token Quota Monitor (/usage Engine)
-# -------------------------------------------------------------
-USAGE_TRACKER = {
-    "start_time": time.time(),
-    "today_date": datetime.date.today().isoformat(),
-    "total_interactions_today": 0,
-    "total_tokens_today": 0,
-    "voice_notes_count": 0,
-    "model_calls": {},
-    "tool_calls": {},
-    "recent_events": []
-}
-
-MODEL_LIMITS_MAP = {
-    "qwen/qwen3.6-27b": {"tpm": 8000, "rpm": 30, "label": "Qwen 3.6 27B (Groq)"},
-    "openai/gpt-oss-120b": {"tpm": 6000, "rpm": 30, "label": "OpenAI GPT-OSS 120B (Groq)"},
-    "groq/compound": {"tpm": 30000, "rpm": 30, "label": "Groq Compound (Groq)"},
-    "gemini-3.7-flash": {"tpm": 250000, "rpm": 5, "label": "Gemini 3.7 Flash (Google)"},
-    "gemini-3.6-flash": {"tpm": 250000, "rpm": 5, "label": "Gemini 3.6 Flash (Google)"},
-    "gemini-3.5-flash": {"tpm": 250000, "rpm": 5, "label": "Gemini 3.5 Flash (Google)"},
-    "gemini-3.5-flash-lite": {"tpm": 250000, "rpm": 15, "label": "Gemini 3.5 Flash Lite (Google)"}
-}
-
-def record_model_usage(model_name, total_tokens=0, prompt_tokens=0, completion_tokens=0):
-    global USAGE_TRACKER
-    now = time.time()
-    today_str = datetime.date.today().isoformat()
-    if USAGE_TRACKER.get("today_date") != today_str:
-        USAGE_TRACKER["today_date"] = today_str
-        USAGE_TRACKER["total_interactions_today"] = 0
-        USAGE_TRACKER["total_tokens_today"] = 0
-        USAGE_TRACKER["voice_notes_count"] = 0
-        USAGE_TRACKER["model_calls"] = {}
-        USAGE_TRACKER["tool_calls"] = {}
-
-    tok = total_tokens if total_tokens > 0 else (prompt_tokens + completion_tokens)
-    if tok == 0:
-        tok = 800 # default conservative estimate
-        
-    USAGE_TRACKER["total_tokens_today"] += tok
-    USAGE_TRACKER["total_interactions_today"] += 1
-    USAGE_TRACKER["model_calls"][model_name] = USAGE_TRACKER["model_calls"].get(model_name, 0) + 1
-    USAGE_TRACKER["recent_events"].append((now, tok, model_name))
-    
-    cutoff = now - 60.0
-    USAGE_TRACKER["recent_events"] = [e for e in USAGE_TRACKER["recent_events"] if e[0] >= cutoff]
-
-def get_live_usage_dashboard():
-    global USAGE_TRACKER
-    now = time.time()
-    cutoff = now - 60.0
-    recent = [e for e in USAGE_TRACKER["recent_events"] if e[0] >= cutoff]
-    USAGE_TRACKER["recent_events"] = recent
-
-    rolling_tpm = {}
-    rolling_rpm = {}
-    for ts, tok, m in recent:
-        rolling_tpm[m] = rolling_tpm.get(m, 0) + tok
-        rolling_rpm[m] = rolling_rpm.get(m, 0) + 1
-
-    cur_m = CURRENT_ENGINE
-    cur_info = MODEL_LIMITS_MAP.get(cur_m, {"tpm": 8000, "rpm": 30, "label": cur_m})
-    cur_tpm = rolling_tpm.get(cur_m, 0)
-    cur_rpm = rolling_rpm.get(cur_m, 0)
-    limit_tpm = cur_info.get("tpm", 8000)
-    limit_rpm = cur_info.get("rpm", 30)
-
-    pct_tpm = min(100, int((cur_tpm / limit_tpm) * 100)) if limit_tpm else 0
-    
-    if pct_tpm < 50:
-        status_badge = "🟢 AMAN (Jauh di bawah limit)"
-        bar = "🟩" * (pct_tpm // 10) + "⬜" * (10 - (pct_tpm // 10))
-    elif pct_tpm < 80:
-        status_badge = "🟡 WASPADA (Sedang aktif)"
-        bar = "🟨" * (pct_tpm // 10) + "⬜" * (10 - (pct_tpm // 10))
-    else:
-        status_badge = "🔴 KRITIS (Mendekati limit per menit)"
-        bar = "🟥" * (pct_tpm // 10) + "⬜" * (10 - (pct_tpm // 10))
-
-    if recent:
-        oldest_ts = recent[0][0]
-        seconds_left = max(0, int(60 - (now - oldest_ts)))
-        rolling_reset_str = f"{seconds_left} detik lagi (otomatis lega)"
-    else:
-        rolling_reset_str = "0 detik (100% Bersih & Siap)"
-
-    now_dt = datetime.datetime.now()
-    # Provider Daily Quota resets at 00:00 UTC (07:00 WIB)
-    next_daily_reset = now_dt.replace(hour=7, minute=0, second=0, microsecond=0)
-    if now_dt >= next_daily_reset:
-        next_daily_reset += datetime.timedelta(days=1)
-    diff_daily = next_daily_reset - now_dt
-    hours_left = int(diff_daily.total_seconds() // 3600)
-    mins_left = int((diff_daily.total_seconds() % 3600) // 60)
-    daily_reset_str = f"{hours_left} jam {mins_left} menit lagi (Setiap 07:00 WIB)"
-
-    today_str = datetime.date.today().strftime("%d-%m-%Y")
-    
-    model_stats_lines = []
-    for m, c in USAGE_TRACKER["model_calls"].items():
-        lbl = MODEL_LIMITS_MAP.get(m, {}).get("label", m)
-        model_stats_lines.append(f"  • {lbl}: **{c} pesan**")
-    model_stats_str = "\n".join(model_stats_lines) if model_stats_lines else "  • Belum ada interaksi hari ini."
-
-    tool_stats_lines = []
-    for t, c in USAGE_TRACKER["tool_calls"].items():
-        tool_stats_lines.append(f"  • `{t}`: {c}x dieksekusi")
-    tool_stats_str = "\n".join(tool_stats_lines) if tool_stats_lines else "  • 0 tool"
-
-    return f"""📊 **Dashboard Penggunaan Model & Kuota AI (Live Tracker)**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 **Model Aktif:** `{cur_info['label']}`
-⏱️ **Waktu Server:** `{now_dt.strftime('%H:%M:%S WIB')}`
-
-📈 **Beban 60 Detik Terakhir (Per-Menit):**
-• **Beban Token (TPM):** `{cur_tpm:,} / {limit_tpm:,} Token` ({pct_tpm}%)
-  [{bar}]
-• **Beban Request (RPM):** `{cur_rpm} / {limit_rpm} RPM`
-• **Status Limit:** {status_badge}
-• **Reset Beban Menit Ini:** ⏳ `{rolling_reset_str}`
-
-📊 **Statistik Akumulasi Hari Ini ({today_str}):**
-• **Total Pesan Diproses:** `{USAGE_TRACKER['total_interactions_today']}`
-• **Total Token Digunakan:** `{USAGE_TRACKER['total_tokens_today']:,}`
-• **Voice Notes (Whisper Turbo):** `{USAGE_TRACKER['voice_notes_count']}` rekaman
-• **Distribusi Panggilan Model:**
-{model_stats_str}
-• **Aktivitas Tool/Vault Recall:**
-{tool_stats_str}
-
-🔄 **Jadwal Reset Kuota Penyedia AI:**
-• **Reset Limit Per Menit (TPM/RPM):** Tiap jeda 60 detik bergulir (*Rolling Window*)
-• **Reset Kuota Harian (RPD):** 🌅 `{daily_reset_str}`
-
-🛡️ **Kesehatan Penyedia Layanan:**
-• **Groq Cloud LPU:** 🟢 Operasional (500 tok/s)
-• **Whisper Large v3:** 🟢 Aktif (0.15s)
-• **Spotify Cloud Bridge:** 🟢 Siap
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 *Ketik `/model` untuk beralih mesin jika kuota model aktif mendekati limit!*"""
-
-
-
-def get_groq_openai_tools():
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": "search_vault",
-                "description": "Search across all markdown notes in AI-Brain for keywords, courses, or concepts.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"query": {"type": "string", "description": "Search keyword"}},
-                    "required": ["query"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "read_vault_file",
-                "description": "Read the exact markdown content of any note in AI-Brain.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"path": {"type": "string", "description": "Relative file path in AI-Brain"}},
-                    "required": ["path"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "write_vault_file",
-                "description": "Create or update a note in AI-Brain.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "path": {"type": "string", "description": "Relative file path in AI-Brain"},
-                        "content": {"type": "string", "description": "Markdown content to write"}
-                    },
-                    "required": ["path", "content"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "create_task",
-                "description": "Create a task in Active-Tasks.md and sync to Google Tasks.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string", "description": "Task title"},
-                        "due_date": {"type": "string", "description": "YYYY-MM-DD"}
-                    },
-                    "required": ["title"]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "spotify_control",
-                "description": "Control Spotify music playback.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "action": {"type": "string", "description": "play, pause, next, prev, queue, lyrics"},
-                        "query": {"type": "string", "description": "Song title or artist"}
-                    },
-                    "required": ["action"]
-                }
-            }
-        }
-    ]
-
-def call_groq_agent_loop(system_prompt, contents, model_name="qwen/qwen3.6-27b"):
-    """Executes a true dynamic multi-hop agentic loop on Groq LPU with live vault tools."""
+def call_groq_api(system_prompt, contents, model_name="openai/gpt-oss-120b"):
+    """Executes chat completions on Groq (OpenAI GPT-OSS 120B / Qwen 3.6 27B / Compound)."""
     if not GROQ_API_KEY:
         return None
     url = "https://api.groq.com/openai/v1/chat/completions"
-    tools = get_groq_openai_tools()
+    groq_messages = [{"role": "system", "content": system_prompt}]
     
-    compact_system = system_prompt
-    if len(compact_system) > 2500:
-        compact_system = compact_system[:2500]
-
-    action_directive = (
-        "\n\n[ATURAN PENTING EKSEKUSI TOOL]:\n"
-        "- Jika Master meminta menambah/mencatat tugas/to-do list (contoh: 'tambah tugas...', 'tolong buatkan task...', 'catat to-do...'), "
-        "WAJIB panggil tool `create_task(title='...', due_date='YYYY-MM-DD')` pada giliran pertama!\n"
-        "- Jika Master meminta memutar lagu/musik, WAJIB panggil tool `spotify_control(action='play', query='...')`!\n"
-        "- Jika Master bertanya tentang isi catatan lama/jadwal kuliah, panggil `search_vault` atau `read_vault_file`!"
-    )
-    compact_system += action_directive
-
-    messages = [{"role": "system", "content": compact_system}]
-    
-    recent_contents = contents[-6:] if len(contents) > 6 else contents
-    for turn in recent_contents:
+    for turn in contents:
         role = turn.get("role")
         m_role = "user" if role == "user" else "assistant"
         c_text = ""
@@ -1534,103 +1274,31 @@ def call_groq_agent_loop(system_prompt, contents, model_name="qwen/qwen3.6-27b")
             if isinstance(p, dict) and "text" in p:
                 c_text += p["text"] + "\n"
         if c_text.strip():
-            messages.append({"role": m_role, "content": c_text.strip()[:1000]})
+            groq_messages.append({"role": m_role, "content": c_text.strip()})
 
-    for hop in range(3):
-        is_final_hop = (hop == 2)
-        payload = {
-            "model": model_name,
-            "messages": messages,
-            "temperature": 0.2,
-            "max_tokens": 4096
-        }
-        if not is_final_hop:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-
-        try:
-            res = session.post(
-                url,
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-                json=payload,
-                timeout=20
-            )
-            if res.status_code == 429:
-                print(f"[Groq 429 on {model_name}] Falling back to openai/gpt-oss-120b...")
-                # Format clean plain text messages for fallback
-                fallback_messages = []
-                for m in messages:
-                    if m.get("role") == "system":
-                        fallback_messages.append(m)
-                    elif m.get("role") == "user":
-                        fallback_messages.append(m)
-                    elif m.get("role") == "tool":
-                        fallback_messages.append({"role": "user", "content": f"[Data Catatan Vault: {m.get('content')}]"})
-                    elif m.get("role") == "assistant" and m.get("content"):
-                        fallback_messages.append({"role": "assistant", "content": m.get("content")})
-                
-                fallback_messages.append({"role": "user", "content": "Tolong berikan ringkasan laporan jadwal/jawaban yang lengkap dan ramah untuk Master Farel berdasarkan data catatan di atas."})
-                
-                fb_payload = {
-                    "model": "openai/gpt-oss-120b",
-                    "messages": fallback_messages,
-                    "temperature": 0.2,
-                    "max_tokens": 2048
-                }
-                res_fb = session.post(url, headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}, json=fb_payload, timeout=20)
-                if res_fb.status_code == 200:
-                    ans_fb = res_fb.json()["choices"][0]["message"].get("content", "")
-                    if ans_fb:
-                        if "<think>" in ans_fb and "</think>" in ans_fb:
-                            ans_fb = ans_fb.split("</think>")[-1].strip()
-                        return ans_fb
-                break
-            elif res.status_code != 200:
-                print(f"[Groq Agent Status {res.status_code}] {res.text[:140]}")
-                break
-                
-            if res.status_code == 200:
-                u_info = res.json().get("usage", {})
-                u_tok = u_info.get("total_tokens", 0)
-                record_model_usage(model_name, total_tokens=u_tok)
-
-            choice = res.json()["choices"][0]
-            msg = choice["message"]
-            
-            # Case 1: Model called one or more tools dynamically on disk
-            if msg.get("tool_calls") and not is_final_hop:
-                messages.append(msg)
-                for tc in msg["tool_calls"]:
-                    fn_name = tc["function"]["name"]
-                    raw_args = tc["function"].get("arguments", "{}")
-                    try:
-                        fn_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                    except Exception:
-                        fn_args = {}
-                    
-                    tool_output = execute_tool_call(fn_name, fn_args)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "name": fn_name,
-                        "content": str(tool_output)[:1200]
-                    })
-                time.sleep(0.4) # Smooth rate-limit buffer
-                continue
-            else:
-                # Case 2: Final synthesized answer from Groq
-                ans = msg.get("content", "")
-                if ans:
-                    if "<think>" in ans and "</think>" in ans:
-                        ans = ans.split("</think>")[-1].strip()
-                    return ans
-        except Exception as e:
-            print(f"[Groq Agent Loop Error] {e}")
-            break
+    payload = {
+        "model": model_name,
+        "messages": groq_messages,
+        "temperature": 0.6,
+        "max_tokens": 4096
+    }
+    try:
+        res = session.post(
+            url,
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=20
+        )
+        if res.status_code == 200:
+            reply = res.json()["choices"][0]["message"]["content"].strip()
+            if "<think>" in reply and "</think>" in reply:
+                reply = reply.split("</think>")[-1].strip()
+            return reply
+        else:
+            print(f"[Groq API Status {res.status_code}] {res.text[:120]}")
+    except Exception as e:
+        print(f"[Groq Call Error] {e}")
     return None
-
-def call_groq_api(system_prompt, contents, model_name="qwen/qwen3.6-27b"):
-    return call_groq_agent_loop(system_prompt, contents, model_name=model_name)
 
 # -------------------------------------------------------------
 # Robust Multi-Hop Agent Loop (1:1 Unified Experience)
@@ -1873,44 +1541,6 @@ def send_chat_action(chat_id, action="typing"):
     except Exception:
         pass
 
-RECENT_CHAT_MESSAGE_IDS = []
-
-def track_chat_message_id(msg_id):
-    global RECENT_CHAT_MESSAGE_IDS
-    if msg_id and isinstance(msg_id, int):
-        RECENT_CHAT_MESSAGE_IDS.append(msg_id)
-        if len(RECENT_CHAT_MESSAGE_IDS) > 120:
-            RECENT_CHAT_MESSAGE_IDS = RECENT_CHAT_MESSAGE_IDS[-120:]
-
-def delete_telegram_messages(chat_id, current_msg_id=None, lookback=500):
-    global RECENT_CHAT_MESSAGE_IDS
-    ids_to_del = set(RECENT_CHAT_MESSAGE_IDS)
-    if current_msg_id and isinstance(current_msg_id, int):
-        for i in range(max(1, current_msg_id - lookback), current_msg_id + 1):
-            ids_to_del.add(i)
-            
-    sorted_ids = sorted(list(ids_to_del))
-    if not sorted_ids:
-        return
-        
-    # Attempt batch delete in chunks of 100
-    for chunk_start in range(0, len(sorted_ids), 100):
-        chunk = sorted_ids[chunk_start:chunk_start+100]
-        try:
-            url = f"{TELEGRAM_API_BASE}/deleteMessages"
-            res = session.post(url, json={"chat_id": chat_id, "message_ids": chunk}, timeout=4)
-            if res.status_code != 200:
-                # If batch is rejected, fallback to individual deletion for this chunk
-                for mid in reversed(chunk):
-                    try:
-                        u = f"{TELEGRAM_API_BASE}/deleteMessage"
-                        session.post(u, json={"chat_id": chat_id, "message_id": mid}, timeout=1)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        time.sleep(0.05)
-
 def send_telegram_message(chat_id, text):
     chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
     for chunk in chunks:
@@ -1924,10 +1554,7 @@ def send_telegram_message(chat_id, text):
             res = session.post(url, json=payload, timeout=8)
             if res.status_code != 200:
                 payload.pop("parse_mode")
-                res = session.post(url, json=payload, timeout=8)
-            if res.status_code == 200:
-                mid = res.json().get("result", {}).get("message_id")
-                track_chat_message_id(mid)
+                session.post(url, json=payload, timeout=8)
         except Exception as e:
             print(f"[Telegram Send Error] {e}")
 
@@ -1969,10 +1596,6 @@ def process_message(chat_id, user_id, message):
         print(f"[Security Notice] Blocked message from ID: {user_id}")
         send_telegram_message(chat_id, "Pemberitahuan.\nAkses ditolak. Bot ini dikhususkan secara privat untuk Master Farel.")
         return
-
-    # Track incoming message ID for visual clear
-    in_mid = message.get("message_id")
-    track_chat_message_id(in_mid)
 
     text = message.get("text") or message.get("caption") or ""
     photos = message.get("photo")
@@ -2350,8 +1973,6 @@ def process_message(chat_id, user_id, message):
         q = trimmed_text.split(" ", 1)[1]
         out = tool_search_vault(q)
         response_text = f"**Laporan.**\nHasil pencarian kata kunci `{q}` di AI-Brain:\n```json\n{json.dumps(out, indent=2)}\n```"
-    elif clean_lower in ("/usage", "/kuota", "/limit", "/token", "/tpm"):
-        response_text = get_live_usage_dashboard()
     elif clean_lower == "/status":
         now = datetime.datetime.now()
         day_name = DAYS_ID[now.weekday()]
@@ -2378,9 +1999,9 @@ def process_message(chat_id, user_id, message):
             f"• 🎵 **Spotify Cloud Engine:** `{spot_str}`\n"
             f"• 📅 **Google Workspace Sync:** `{g_auth_str}`\n"
             f"• ⏰ **OpenClaw Cron Engine:** `🟢 Aktif ({len(jobs)} Jadwal Terdaftar)`\n"
-            f"• 📂 **Knowledge Memory:** `Obsidian AI-Brain (86 Catatan, 100% Synced)`\n"
+            f"• 📂 **Knowledge Memory:** `Obsidian AI-Brain (70 Catatan, 100% Synced)`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 *Pintasan Cepat: `/usage` (cek sisa limit kuota), `/model` (ganti AI), `/lyrics` (lirik), `/tasks` (to-do)*"
+            f"💡 *Pintasan Cepat: `/model` (ganti AI), `/lyrics` (lirik lagu), `/browse` (web), `/tasks` (to-do)*"
         )
     elif trimmed_text.startswith(("/grill ", "/grill_me ")):
         topic = trimmed_text.split(" ", 1)[1].strip()
@@ -2446,24 +2067,13 @@ def process_message(chat_id, user_id, message):
             response_text = "Pemberitahuan.\nModul Browser Agent belum aktif."
         log_title = f"[Browser Action: {task_query}]"
         append_to_daily_log(log_title, response_text)
-    elif clean_lower in ("/clear", "/reset", "/new", "/wipe"):
-        global conversation_history, RECENT_CHAT_MESSAGE_IDS
+    elif clean_lower == "/clear":
+        global conversation_history
         conversation_history = []
-        
-        # Auto-Wipe all recent visual chat messages from Telegram screen!
-        RECENT_CHAT_MESSAGE_IDS = []
-        delete_telegram_messages(chat_id, current_msg_id=in_mid, lookback=500)
-
-        response_text = (
-            "🧹 **Laporan.**\n"
-            "Seluruh riwayat chat visual dan memori sesi obrolan telah dibersihkan!\n"
-            "• **Layar Telegram:** Bersih & Segar ✨\n"
-            "• **Konteks Obrolan:** 0 Token (Hemat maksimal ⚡)\n"
-            "• **Memori AI-Brain (Vault):** 🟢 Tetap 100% tersambung dan siap diakses kapan pun Master butuhkan!"
-        )
+        response_text = "**Laporan.**\nRiwayat sesi percakapan sementara telah dibersihkan. Memori jangka panjang di AI-Brain tetap utuh dan teratur."
     elif clean_lower == "/help":
         response_text = (
-            "**Panduan Lengkap Raphael AI-Brain (Versi 2.5.0 — Agent Skills & High-Effort Cognitive Hub):**\n\n"
+            "**Panduan Lengkap Raphael AI-Brain (Versi 2.4.0 — Agent Skills & High-Effort Cognitive Hub):**\n\n"
             "🌐 **1. Agen Browser Otonom (Project Mariner / Computer Use)**:\n"
             "- `/browse <instruksi/pencarian>` : Mengoperasikan Chrome di laptop secara mandiri, mencari data, mengisi form, dan mengirim screenshot hasil ke Telegram.\n\n"
             "🧠 **2. Fitur Kognitif & Keahlian Agen (*Agent Skills*)**:\n"
@@ -2479,10 +2089,8 @@ def process_message(chat_id, user_id, message):
             "- `/queue <lagu>` : Masukkan lagu ke antrean berikutnya.\n"
             "- `/pause` / `/next` / `/prev` / `/vol <0-100>` : Kendali pemutaran.\n"
             "- `/devices` : Cek perangkat aktif.\n\n"
-            "⏰ **5. Jadwal, Kuota & Waktu Presisi (OpenClaw Engine)**:\n"
+            "⏰ **5. Jadwal & Waktu Presisi (OpenClaw Engine)**:\n"
             "- `/status` : Cek kesehatan sistem, model, & koneksi.\n"
-            "- `/usage` : Cek beban token per-menit (TPM), sisa kuota & jadwal reset.\n"
-            "- `/clear` : Bersihkan riwayat chat sesi (memori vault tetap aman).\n"
             "- `/cron` : Melihat jadwal cron job aktif.\n"
             "- `/remind <waktu> <pesan>` : Buat pengingat terjadwal.\n"
             "- `/time` : Jam server real-time WIB (Presisi Detik)."
@@ -2503,8 +2111,6 @@ def register_telegram_commands():
         url = f"{TELEGRAM_API_BASE}/setMyCommands"
         commands = [
             {"command": "status", "description": "📊 Cek status sistem, AI-Brain & koneksi server"},
-            {"command": "usage", "description": "📈 Cek beban token TPM, sisa kuota & jadwal reset"},
-            {"command": "clear", "description": "🧹 Bersihkan riwayat chat (memori vault tetap aman)"},
             {"command": "model", "description": "🧠 Ganti mesin AI (OpenAI 120B, Qwen 3.6 27B, Gemini 3.7)"},
             {"command": "browse", "description": "🌐 Agen Browser Mariner: Navigasi & aksi web di Chrome"},
             {"command": "grill", "description": "🥊 Socratic Grill-Me: Uji & tantang arsitektur sistem"},

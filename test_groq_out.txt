@@ -1,0 +1,8 @@
+```json
+{
+  "tool": "search_vault",
+  "parameters": {
+    "query": "rencana studi Semester 3 mata kuliah jadwal"
+  }
+}
+```
